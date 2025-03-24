@@ -1,11 +1,14 @@
 from pydantic import BaseModel
 
-class RequestFlatsByDistrictAndRooms(BaseModel):
-    district: str
-    rooms: str
+class RequestFlatsByRegionAndRooms(BaseModel):
+    region: str
+    rooms: int
     
 class RequestRooms(BaseModel):
-    rooms: str
+    rooms: int
     
-class RequestDistrict(BaseModel):
-    district: str
+class RequestRegion(BaseModel):
+    region: str
+    
+class RequestAdress(BaseModel):
+    adress: str
