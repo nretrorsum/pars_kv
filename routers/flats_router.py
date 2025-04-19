@@ -2,6 +2,14 @@ from fastapi import APIRouter
 from db.rieltor_repository import rieltor_repository
 from routers.models.request_models import (RequestFlatsByRegionAndRooms, 
 RequestRooms, RequestRegion, RequestAdress)
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+logger = logging.getLogger("uvicorn.access")
 
 flats_router = APIRouter(
     prefix = '/flats'
@@ -12,7 +20,7 @@ async def count_flats():
     return await rieltor_repository.get_all_flats()
 
 @flats_router.get('/count_by_rooms')
-async def count_flats_by_rooms(rooms: str):
+async def count_flats_by_rooms(rooms: int):
     return await rieltor_repository.count_flats_by_rooms(rooms)
 
 @flats_router.post('/count_by_region_rooms')

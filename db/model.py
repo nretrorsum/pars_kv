@@ -62,6 +62,11 @@ class UserSubscription(Base):
     # Зв'язок з підпискою
     subscription = relationship("Subscription", back_populates="user_subscriptions")
     
+class ExpiredAccessTokens(Base):
+    __tablename__ = 'expired_tokens'
+    
+    id = Column(UUID(as_uuid=True),primary_key=True, unique=True, nullable=False, default = uuid.uuid4)
+    token = Column(String, nullable=False)
     
 class Subscription(Base):
     __tablename__ = 'subscription'
@@ -74,5 +79,3 @@ class Subscription(Base):
     
     # Зв'язок з таблицею user_subscription
     user_subscriptions = relationship("UserSubscription", back_populates="subscription")
-    
-    
