@@ -12,12 +12,13 @@ class UserRegistrationModel(BaseModel):
     date_of_registration: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RegUserModel(BaseModel):
     name: str
     surname: str
+    password: str
     email: str
 
 class UserModelResponse(BaseModel):
@@ -29,7 +30,7 @@ class UserModelResponse(BaseModel):
     subscription: Optional['UserSubscriptionModel']  # Це буде заміщене на модель UserSubscriptionModel
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserSubscriptionModel(BaseModel):
@@ -41,7 +42,7 @@ class UserSubscriptionModel(BaseModel):
     status: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubscriptionModel(BaseModel):
@@ -52,4 +53,8 @@ class SubscriptionModel(BaseModel):
     duration_days: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class LoginUser(BaseModel):
+    login: str
+    password: str

@@ -1,7 +1,7 @@
 import aiohttp
 from bs4 import BeautifulSoup
 import re
-import logging
+from logger import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import JSON  # Додано для зберігання списку фото
 import uuid
@@ -9,7 +9,7 @@ from datetime import datetime
 from db.model import FlatsFromRieltor
 import json
 
-logging.basicConfig(level=logging.INFO)
+logger = get_logger(__name__)
 
 async def parse_flats_from_rieltor(session: AsyncSession, page: int):
     if page == 0:
@@ -24,7 +24,7 @@ async def parse_flats_from_rieltor(session: AsyncSession, page: int):
         try:
             async with http_session.get(url, headers=headers) as response:
                 if response.status != 200:
-                    logging.error(f"Не вдалося завантажити сторінку {page}! Статус: {response.status}")
+                    logger.error(f"Не вдалося завантажити сторінку {page}! Статус: {response.status}")
                     return
 
                 html = await response.text()
@@ -66,7 +66,7 @@ async def parse_flats_from_rieltor(session: AsyncSession, page: int):
                             rooms = int(re.sub(r'[^\d]', '', rooms)) if rooms and rooms != 'Null' else 0
                         except ValueError:
                             rooms = 0
-                            logging.warning(f"Не вдалося перетворити кількість кімнат на число: {rooms}")
+                            logger.warning(f"Не вдалося перетворити кількість кімнат на число: {rooms}")
 
                         # Площа
                         size = card.find_all('div', class_='catalog-card-details-row')
@@ -79,7 +79,7 @@ async def parse_flats_from_rieltor(session: AsyncSession, page: int):
                                 if numbers:
                                     total_size = str(sum(int(num) for num in numbers))
                                 else:
-                                    logging.warning(f"Не вдалося знайти числа у рядку: {size_text}")
+                                    logger.warning(f"Не вдалося знайти числа у рядку: {size_text}")
 
                         # Поверх
                         floor = card.find_all('div', class_='catalog-card-details-row')
@@ -150,11 +150,11 @@ async def parse_flats_from_rieltor(session: AsyncSession, page: int):
                         session.add(flat)
 
                     except Exception as e:
-                        logging.error(f"Помилка при обробці картки: {e}")
+                        logger.error(f"Помилка при обробці картки: {e}")
                         continue
 
                 await session.commit()
-                logging.info(f"Дані зі сторінки {page} успішно додано до бази даних.")
+                logger.info(f"Дані зі сторінки {page} успішно додано до бази даних.")
 
         except Exception as e:
-            logging.error(f"Помилка при парсингу сторінки {page}: {e}")
+            logger.error(f"Помилка при парсингу сторінки {page}: {e}")

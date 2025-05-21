@@ -1,21 +1,16 @@
 from fastapi import FastAPI, Request
-from main import parse_flats
 from db.db_connection import get_db
 from routers.flats_router import flats_router
 from rieltor_scrap import parse_flats_from_rieltor
 from db.db_connection import async_session
-from auth.registration import auth_router
+from auth.auth_router import auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-import logging
+from logger import get_logger
+from routers.tp_router import apartment_router
 
+logger = get_logger(__name__)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-
-logger = logging.getLogger("uvicorn")
 
 app = FastAPI()
 
@@ -46,6 +41,11 @@ app.include_router(
     tags = ['Auth']
 )
 
+app.include_router(
+    apartment_router,
+    tags = ['Apartments']
+)
+
 @app.get('/rieltor_parse')
 async def rieltor_parse():
     async with async_session() as session:  # Create an instance of AsyncSession
@@ -53,13 +53,6 @@ async def rieltor_parse():
             await parse_flats_from_rieltor(session=session, page=page)
     return {'status': 'succeed'}
 
-@app.get('/main')
-async def get_info():
-    total_pages = 99  # Вказуємо кількість сторінок для парсингу, можна змінити
-    for page in range(1, total_pages + 1):
-        async for session in get_db():
-            await parse_flats(session, page)
-    return {'status':'succeed'}
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

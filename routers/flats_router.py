@@ -1,13 +1,10 @@
 from fastapi import APIRouter
-from db.rieltor_repository import rieltor_repository
+from db.analyze_repository import rieltor_repository
 from routers.models.request_models import (RequestFlatsByRegionAndRooms, 
 RequestRooms, RequestRegion, RequestAdress)
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+
 
 logger = logging.getLogger("uvicorn.access")
 
