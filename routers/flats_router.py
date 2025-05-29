@@ -1,73 +1,41 @@
 from fastapi import APIRouter
 from db.analyze_repository import rieltor_repository
-from routers.models.request_models import (RequestFlatsByRegionAndRooms, 
-RequestRooms, RequestRegion, RequestAdress)
-import logging
+from logger import get_logger
 
-
-
-logger = logging.getLogger("uvicorn.access")
+logger = get_logger(__name__)
 
 flats_router = APIRouter(
     prefix = '/flats'
 )
 
-@flats_router.get('/count')
-async def count_flats():
-    return await rieltor_repository.get_all_flats()
+@flats_router.get('/districts')
+async def return_flats_count(city: str = 'Lviv'):
+    return str(await rieltor_repository.get_districts_by_city(city))
 
-@flats_router.get('/count_by_rooms')
-async def count_flats_by_rooms(rooms: int):
-    return await rieltor_repository.count_flats_by_rooms(rooms)
-
-@flats_router.post('/count_by_region_rooms')
-async def count_flats_by_region(request: RequestFlatsByRegionAndRooms):
-    return await rieltor_repository.count_flats_by_region(
-        region=request.region, 
-        rooms = request.rooms
-        )
+@flats_router.get('/marker_growth')
+async def market_growth():
+    # Отримуємо всі унікальні дати
+    dates = await rieltor_repository.get_all_dates()
     
-@flats_router.post("/get_flats_by_region_rooms")
-async def get_flats_by_region_rooms(request: RequestFlatsByRegionAndRooms):
-    return await rieltor_repository.get_flats_by_rooms_region(
-        region = request.region,
-        rooms = request.rooms
-    )
+    # Отримуємо кількість квартир для кожної дати
+    result = {}
+    for date in dates:
+        count = await rieltor_repository.count_flats_for_date(date)
+        result[date] = count
+
+    #logger.debug(f'Result in market growth:{result}')
+
+    # Сортуємо дати у зворотному хронологічному порядку (від нових до старих)
+    sorted_dates = sorted(result.keys(), reverse=True)
+
+    logger.debug(f'Result in market growth:{sorted_dates}')
     
-@flats_router.post('/avg_price_by_rooms')
-async def get_avg_price_by_rooms(request: RequestRooms):
-    return await rieltor_repository.get_avg_price_by_rooms(
-        rooms=request.rooms
-    )
-
-@flats_router.post('/avg_price_by_rooms_region')
-async def get_avg_price_by_rooms_region(request: RequestFlatsByRegionAndRooms):
-    return await rieltor_repository.get_avg_price_by_rooms_region(
-        rooms = request.rooms,
-        region = request.region
-    )
+    # Обчислюємо різниці між послідовними датами
+    result_list = {}
+    for i in range(len(sorted_dates)-1):
+        current_date = sorted_dates[i]
+        next_date = sorted_dates[i+1]
+        difference = round(((result[current_date] - result[next_date])/result[next_date])*100, 2)
+        result_list[f"{current_date} → {next_date}"] = difference
     
-@flats_router.post("/avg_price_per_sqm")
-async def get_avg_price_per_sqm():
-    return await rieltor_repository.get_avg_price_per_m2()
-
-@flats_router.post("/get_flats_by_sqm_price")
-async def get_flats_by_sqm_price():
-    return await rieltor_repository.get_flats_by_sqm_price()
-
-@flats_router.post("/get_flats_by_sqm_price_region")
-async def get_flats_by_sqm_price_region(request: RequestRegion):
-    return await rieltor_repository.get_flats_by_sqm_price_region(
-        region=request.region
-    )
-
-@flats_router.post("/get_flats_by_sqm_price_region_rooms")
-async def get_flats_by_sqm_price_region_rooms(request: RequestFlatsByRegionAndRooms):
-    return await rieltor_repository.get_flats_by_sqm_price_region_rooms(
-        region=request.region,
-        rooms=request.rooms
-    )
-    
-@flats_router.post('/get_flats_by_adress')
-async def get_flats_by_adress(request: RequestAdress):
-    return await rieltor_repository.get_flats_by_adress(request.adress)
+    return result_list

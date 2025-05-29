@@ -55,3 +55,15 @@ async def get_user(current_user: user_dependency):
         return current_user
     except Exception as e:      
         return {'error': str(e)}
+
+@auth_router.post('/logout',status_code = 204)
+async def logout(response: Response, authToken: Optional[str] = Cookie(alias='authToken', default=None)):
+    response.set_cookie(
+        key='authToken',
+            value='',
+            max_age=0,
+            secure=False,
+            httponly=False,
+            samesite='lax'
+    )
+    return {'status':'User log out'}

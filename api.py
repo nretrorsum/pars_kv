@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from logger import get_logger
 from routers.tp_router import apartment_router
+from routers.bot_united_endpoints import bot_united_router
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods= ['*'],
     allow_headers= ['*']
+)
+
+app.include_router(
+    bot_united_router,
+    tags=['Bot']
 )
 
 app.include_router(

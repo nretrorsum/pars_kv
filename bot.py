@@ -34,7 +34,7 @@ def main_menu():
     kb = InlineKeyboardBuilder()
     kb.button(text="📊 Загальна кількість квартир", callback_data="count_flats")
     kb.button(text="🛏️ Кількість за кількістю кімнат", callback_data="count_by_rooms")
-    kb.button(text="📍 Квартири за регіоном і кімнатами", callback_data="get_flats_by_region_rooms")
+    kb.button(text="📍 Кількість квартир за регіоном", callback_data="get_flats_by_region_rooms")
     kb.button(text="💰 Середня ціна за кімнати", callback_data="avg_price_by_rooms")
     kb.button(text="📏 Ціна за м²", callback_data="avg_price_per_sqm")
     kb.button(text="Топ квартир по ціні за м2 і району", callback_data="get_flats_by_sqm_price_region")
@@ -63,7 +63,7 @@ async def process_callback(call: CallbackQuery, state: FSMContext):
 
         elif call.data == "get_flats_by_region_rooms":
             await call.message.answer("📍 Введіть регіон:")
-            await state.set_state(FlatStates.waiting_for_region_rooms)
+            await state.set_state(FlatStates.waiting_for_region)
 
         elif call.data == "avg_price_by_rooms":
             await call.message.answer("💰 Введіть кількість кімнат для розрахунку середньої ціни:")
@@ -128,24 +128,25 @@ async def get_flats_by_sqm_price_region(message: Message, state: FSMContext):
     except ValueError:
         await message.answer('Введіть правильний район')
 
-@dp.message(FlatStates.waiting_for_region_rooms)
-async def get_region_for_flats(message: Message, state: FSMContext):
-    await state.update_data(region=message.text)
-    await message.answer("🛏️ Введіть кількість кімнат:")
-    await state.set_state(FlatStates.waiting_for_rooms)
 
-@dp.message(FlatStates.waiting_for_rooms)
+@dp.message(FlatStates.waiting_for_region)
 async def get_flats_by_region_rooms(message: Message, state: FSMContext):
     try:
-        rooms = int(message.text)
+        region = str(message.text)
         user_data = await state.get_data()
-        region = user_data.get("region")
         
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{API_URL}/get_flats_by_region_rooms", json={"region": region, "rooms": rooms}) as response:
-                data = await response.json()
-                await message.answer(f"🏡 Квартири в {region} з {rooms} кімнатами:\n{data}")
-        
+            async with session.post(f"http://localhost:8001/bot/count_flats_by_rooms_region?received_region={region}") as response:
+                logger.debug(f'Response:{response}')
+                result = await response.json()
+                await message.answer(
+                    f"Кількість квартир в районі {region}:\n"
+                    f"1 кімната: {result['1_room']}\n"
+                    f"2 кімнати: {result['2_room']}\n"
+                    f"3 кімнати: {result['3_room']}\n"
+                    f"4 кімнати: {result['4_room']}\n"
+                    f"Всього: {result['total']}"
+)
         await state.clear()  
     except ValueError:
         await message.answer("❌ Введіть коректне число.")
@@ -163,30 +164,46 @@ async def get_avg_price_by_rooms(message: Message, state: FSMContext):
         await message.answer("❌ Введіть коректне число.")
 
 @dp.message(FlatStates.analytics)
-async def get_full_analytics(message: Message, state: FSMContext):
+async def get_full_analytics(message: types.Message, state: FSMContext):
     try:
-        logger.debug(f'Analytics button entered')
-        # Визначаємо всі можливі параметри
-        all_regions = ['Франківський', 'Залізничний', 'Шевченківський', 'Личаківський', 'Сихівський']
-        all_rooms = ['1', '2', '3', '4']
-        
+        url = "http://localhost:8001/bot/full_analytics"  # встав сюди свій URL
         async with aiohttp.ClientSession() as session:
-            # Виконуємо всі запити
-            results = {
-                'general': await get_general_stats(session),
-                'by_region': await get_stats_by_regions(session, all_regions),
-                'by_rooms': await get_stats_by_rooms(session, all_rooms),
-                'by_region_and_rooms': await get_stats_by_region_and_rooms(session, all_regions, all_rooms)
-            }
-            logger.debug(f'Analytics requests:{json.dump(results)}')
-            # Формуємо звіт
-            report = generate_full_report(results)
-            logger.debug(f'Full report:{report}')
-            await message.answer(report, parse_mode='HTML')
-            
+            async with session.get(url) as resp:
+                data = await resp.json()
+
+        text_lines = []
+        # Загальна інформація
+        total = data['general']['total_count']
+        text_lines.append(f"🏠 <b>Всього квартир:</b> {total}\n")
+
+        text_lines.append("<b>Середня ціна за кімнатами:</b>")
+        for rooms, avg_price in data['general']['avg_price_by_rooms'].items():
+            text_lines.append(f"  {rooms} кімнат(и): {float(avg_price):,.2f} грн")
+        text_lines.append("")
+
+        text_lines.append("<b>Кількість квартир по районах:</b>")
+        for region, info in data['by_region'].items():
+            text_lines.append(f"  {region}: {info['count']} квартир")
+        text_lines.append("")
+
+        text_lines.append("<b>Кількість та середня ціна по кімнатах:</b>")
+        for rooms, info in data['by_rooms'].items():
+            text_lines.append(f"  {rooms} кімнат(и): {info['count']} квартир, середня ціна {float(info['avg_price']):,.2f} грн")
+        text_lines.append("")
+
+        text_lines.append("<b>За районом і кількістю кімнат:</b>")
+        for region, rooms_info in data['by_region_and_rooms'].items():
+            text_lines.append(f"🏙 <b>{region}:</b>")
+            for rooms, stats in rooms_info.items():
+                text_lines.append(f"  {rooms} кімнат(и): {stats['count']} квартир, середня ціна {float(stats['avg_price']):,.2f} грн")
+            text_lines.append("")
+
+        report = "\n".join(text_lines)
+        await message.answer(report, parse_mode='HTML')
+
     except Exception as e:
-        logger.error(f'Analytics error: {str(e)}')
-        await message.answer("❌ Помилка при отриманні аналітики. Спробуйте пізніше.")
+        await message.answer("❌ Сталася помилка при отриманні аналітики.")
+        # тут можна ще залогувати помилку, якщо треба
 
 
 async def main():

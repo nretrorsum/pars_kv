@@ -1,8 +1,11 @@
 from db.abstract_repository import AbstractFlatsRepository
 from db.db_connection import async_session
-from sqlalchemy import select, func, desc, distinct
+from sqlalchemy import select, func, desc, distinct, cast, Date, Float
 from db.model import FlatsFromRieltor
 from typing import Optional, List
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class RieltorFlatsRepository(AbstractFlatsRepository):
@@ -44,6 +47,21 @@ class RieltorFlatsRepository(AbstractFlatsRepository):
                 query = select(func.count(FlatsFromRieltor.id)).where(
                     FlatsFromRieltor.region.ilike(f'%{region}%'),
                     FlatsFromRieltor.rooms == rooms,
+                    FlatsFromRieltor.date_of_scrap == last_date
+                )
+                result = await session.execute(query)
+                return result.scalar()
+            
+    async def count_all_flats_by_region(self, region: str) -> int:
+        """Підрахувати квартири за регіоном та кількістю кімнат"""
+        async with self.session_factory() as session:
+            async with session.begin():
+                last_date = await self._get_last_date(session)
+                if not last_date:
+                    return 0
+                    
+                query = select(func.count(FlatsFromRieltor.id)).where(
+                    FlatsFromRieltor.region.ilike(f'%{region}%'),
                     FlatsFromRieltor.date_of_scrap == last_date
                 )
                 result = await session.execute(query)
@@ -97,7 +115,15 @@ class RieltorFlatsRepository(AbstractFlatsRepository):
                 )
                 result = await session.execute(query)
                 return result.scalar()
-    
+    """       
+    async def get_avg_price_per_m2_by_region(self, region: str) -> Optional[float]:
+        async with self.session_factory() as session:
+            query = (select(func.avg(cast(FlatsFromRieltor.price_per_m2, Float))  # Явне приведення до Float
+                .where(FlatsFromRieltor.region.ilike(f"%{region}%"))))
+            result = await session.execute(query)
+            avg_price = result.scalar()
+            return float(avg_price) if avg_price is not None else None
+    """
     async def get_avg_price_per_m2(self) -> Optional[float]:
         """Отримати середню ціну за квадратний метр"""
         async with self.session_factory() as session:
@@ -179,6 +205,68 @@ class RieltorFlatsRepository(AbstractFlatsRepository):
                 
                 result = await session.execute(query)
                 return result.scalars().all()
+            
+    async def get_districts_by_city(self, city: str):
+        async with self.session_factory() as session:
+            async with session.begin():
+                query = (
+                    select(FlatsFromRieltor)
+                    .where(FlatsFromRieltor.region.ilike(f'%{city}%'))
+                )
+                
+                result = await session.execute(query)
+                return result.scalars().all()
+    async def get_all_dates(self):
+        async with self.session_factory() as session:
+            async with session.begin():
+                query = select(
+                func.to_char(FlatsFromRieltor.date_of_scrap, 'YYYY-MM-DD').label('date')
+                ).distinct()
+
+                result = await session.execute(query)
+                data = result.scalars().all()
+                logger.debug(f'All scrap dates:{data}')
+                return data
+    
+    
+    async def count_flats_for_date(self, date: str):
+        async with self.session_factory() as session:
+            query = select(func.count()).where(
+                func.to_char(FlatsFromRieltor.date_of_scrap, 'YYYY-MM-DD') == date
+            )
+            result = await session.execute(query)
+            return result.scalar()  # Повертає тільки число
+    async def get_avg_price_by_region(self, region: str) -> Optional[float]:
+        """Отримати середню ціну квартири в заданому районі за останню дату"""
+        async with self.session_factory() as session:
+            async with session.begin():
+                last_date = await self._get_last_date(session)
+                if not last_date:
+                    return None
+
+                query = select(func.avg(FlatsFromRieltor.price)).where(
+                    FlatsFromRieltor.region == region,
+                    FlatsFromRieltor.date_of_scrap == last_date
+                )
+                result = await session.execute(query)
+                return result.scalar()
+            
+    async def get_avg_price_per_m2_by_region(self, region: str) -> Optional[float]:
+        """Отримати середню ціну за м² в заданому районі за останню дату"""
+        async with self.session_factory() as session:
+            async with session.begin():
+                last_date = await self._get_last_date(session)
+                if not last_date:
+                    return None
+
+                query = select(func.avg(FlatsFromRieltor.price_per_m2)).where(
+                    FlatsFromRieltor.region == region,
+                    FlatsFromRieltor.date_of_scrap == last_date
+                )
+                result = await session.execute(query)
+                data = result.scalar()
+                logger.debug(f'result:{data}')
+                return data
 
 # Ініціалізація репозиторію
 rieltor_repository = RieltorFlatsRepository(async_session)
