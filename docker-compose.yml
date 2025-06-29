@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+    container_name: pars_kv_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # 👈 монтуємо локальну папку всередину контейнера
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/pars_kv_db
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    container_name: pars_kv_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pars_kv_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
